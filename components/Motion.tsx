@@ -130,9 +130,9 @@ export default function Motion() {
       if (reduce) {
         gsap.set(loader.current, { display: "none" });
       } else {
-        tl.to(bar.current, { scaleX: 1, duration: 1.1, ease: "power2.inOut" })
-          .to(loader.current, { yPercent: -100, duration: 0.9, ease: "power4.inOut" })
-          .to(heroWords, { yPercent: 0, duration: 1.1, ease: "power4.out", stagger: 0.04 }, "-=0.35")
+        tl.to(bar.current, { scaleX: 1, duration: 0.5, ease: "power2.inOut" })
+          .to(loader.current, { yPercent: -100, duration: 0.65, ease: "power4.inOut" })
+          .to(heroWords, { yPercent: 0, duration: 1.1, ease: "power4.out", stagger: 0.04 }, "-=0.4")
           .to(heroIn, { opacity: 1, y: 0, duration: 0.9, ease: "power3.out", stagger: 0.1 }, "-=0.8")
           .set(loader.current, { display: "none" });
       }

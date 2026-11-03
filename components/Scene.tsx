@@ -2,8 +2,8 @@
 
 import { Component, useEffect, useMemo, useRef, type ReactNode } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { RoundedBox } from "@react-three/drei";
 import * as THREE from "three";
+import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
 import { pointer, sceneState } from "@/lib/state";
 
 // One camera-facing key per page section: where the automation core sits, its size, and the orbit radius.
@@ -48,13 +48,15 @@ function damp(cur: number, target: number, rate: number, dt: number) {
 }
 
 function Rig() {
-  const { camera, size } = useThree();
+  const { camera, size, setDpr, setFrameloop } = useThree();
+  const quality = useRef({ n: 0, sum: 0, level: 0 });
   const core = useRef<THREE.Group>(null);
   const inner = useRef<THREE.Mesh>(null);
   const rings = useRef<(THREE.Mesh | null)[]>([]);
   const chips = useRef<(THREE.Group | null)[]>([]);
   const boxes = useRef<(THREE.Mesh | null)[]>([]);
   const labels = useMemo(() => APPS.map(labelTexture), []);
+  const boxGeo = useMemo(() => new RoundedBoxGeometry(0.78, 0.78, 0.78, 4, 0.14), []);
   const dust = useRef<THREE.Points>(null);
   const packets = useRef<(THREE.Mesh | null)[]>([]);
   const state = useRef({ s: 1, r: 3.5, ox: 0, oy: 0 });
@@ -104,6 +106,22 @@ function Rig() {
   const target = useMemo(() => new THREE.Vector3(), []);
 
   useFrame((st, dtRaw) => {
+    // adaptive quality: drop resolution, then stop rendering, if frames stay slow
+    const q = quality.current;
+    if (dtRaw < 0.5) {
+      q.n++;
+      q.sum += dtRaw;
+    }
+    if (q.n === 60) {
+      const avg = q.sum / 60;
+      q.n = 0;
+      q.sum = 0;
+      if (avg > 0.05 && q.level < 2) {
+        q.level++;
+        if (q.level === 1) setDpr(1);
+        else setFrameloop("never");
+      }
+    }
     const dt = Math.min(dtRaw, 0.05);
     const t = st.clock.elapsedTime * (reduce ? 0.15 : 1);
     const mobile = size.width < 820;
@@ -226,9 +244,9 @@ function Rig() {
 
       {APPS.map((name, i) => (
         <group key={name} ref={(el) => void (chips.current[i] = el)}>
-          <RoundedBox ref={(el) => void (boxes.current[i] = el)} args={[0.78, 0.78, 0.78]} radius={0.14} smoothness={4}>
+          <mesh ref={(el) => void (boxes.current[i] = el)} geometry={boxGeo}>
             <meshStandardMaterial color={TONES[i % 3]} roughness={0.34} metalness={0.08} />
-          </RoundedBox>
+          </mesh>
           <sprite position={[0, -0.78, 0]} scale={[1.28, 0.36, 1]}>
             <spriteMaterial map={labels[i]} transparent depthWrite={false} />
           </sprite>
@@ -261,6 +279,7 @@ class Boundary extends Component<{ children: ReactNode }, { failed: boolean }> {
 }
 
 export default function Scene() {
+  const lowEnd = useMemo(() => (navigator.hardwareConcurrency || 8) <= 4, []);
   useEffect(() => {
     const move = (e: PointerEvent) => {
       pointer.x = (e.clientX / window.innerWidth) * 2 - 1;
@@ -283,7 +302,7 @@ export default function Scene() {
       <Boundary>
         <Canvas
           camera={{ position: [0, 0, 10], fov: 40 }}
-          dpr={[1, 1.75]}
+          dpr={[1, lowEnd ? 1.25 : 1.75]}
           gl={{ antialias: true, alpha: true, powerPreference: "high-performance", toneMapping: THREE.NoToneMapping }}
         >
           <Rig />
